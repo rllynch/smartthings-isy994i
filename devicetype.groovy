@@ -91,16 +91,6 @@ private getHostAddress() {
     def ip = getDataValue("ip")
     def port = getDataValue("port")
 
-    if (!ip || !port) {
-        def parts = device.deviceNetworkId.split(":")
-        if (parts.length == 2) {
-            ip = parts[0]
-            port = parts[1]
-        } else {
-            //log.warn "Can't figure out ip and port for device: ${device.id}"
-        }
-    }
-
     //convert IP/port
     ip = convertHexToIP(ip)
     port = convertHexToInt(port)
@@ -145,8 +135,8 @@ def off() {
 }
 
 def poll() {
-    if (device.deviceNetworkId.endsWith(':0050')) {
-        log.debug "Executing 'poll' from ${device.deviceNetworkId} "
+    if (!device.deviceNetworkId.contains(':')) {
+        log.debug "Executing 'poll' from ${device.deviceNetworkId}"
 
         def path = "/rest/status"
         getRequest(path)

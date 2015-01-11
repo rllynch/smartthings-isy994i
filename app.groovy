@@ -23,8 +23,6 @@ definition(
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
     iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
     iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png") {
-    appSetting "username"
-    appSetting "password"
 }
 
 
@@ -34,6 +32,7 @@ preferences {
     page(name:"nodePage", title:"ISY Setup 3", content:"nodePage")
 }
 
+// Credentials preferences page - collect ISY username and password
 def credPage() {
     state.nodes = [:]
     state.devices = [:]
@@ -46,14 +45,15 @@ def credPage() {
     }
 }
 
+// ISY selection page - discover and choose which ISY to control
 def isyPage() {
     def refreshInterval = 5
 
-    if(!state.subscribe) {
+    if(!state.subscribed) {
         log.debug('Subscribing to updates')
         // subscribe to answers from HUB
         subscribe(location, null, locationHandler, [filterEvents:false])
-        state.subscribe = true
+        state.subscribed = true
     }
 
     log.debug('Performing discovery')
@@ -68,6 +68,7 @@ def isyPage() {
     }
 }
 
+// Returns a map of ISYs for the preference page
 def getDevicesForDialog() {
     def devices = getDevices()
     def map = [:]
@@ -79,17 +80,19 @@ def getDevicesForDialog() {
     map
 }
 
+// Returns a map of ISYs for internal use
 def getDevices() {
     if (!state.devices) { state.devices = [:] }
     log.debug("There are ${state.devices.size()} devices at this time")
     state.devices
 }
 
+// Node selection preference page - choose which Insteon devices to control
 def nodePage() {
     def refreshInterval = 5;
     def selDev = getSelectedDevice()
     def path = "/rest/nodes"
-    sendHubCommand(getRequest(selDev.value.ip, path))
+    sendHubCommand(getRequest(selDev.value.ip, selDev.value.port, path))
 
     def nodes = getNodes()
 
@@ -100,6 +103,7 @@ def nodePage() {
     }
 }
 
+// Returns a map of Insteon nodes for the preferences page
 def getSelectedDevice() {
     def selDev
     selectedISY.each { dni ->
@@ -110,6 +114,7 @@ def getSelectedDevice() {
     selDev
 }
 
+// Returns a map of Insteon nodes for internal use
 def getNodes() {
     if (!state.nodes) {
         state.nodes = [:]
@@ -119,6 +124,7 @@ def getNodes() {
     state.nodes
 }
 
+// Handle discovery answers from ISYs (via the ST hub)
 def locationHandler(evt) {
     if(evt.name == "ping") {
         return ""
@@ -130,6 +136,9 @@ def locationHandler(evt) {
     def hub = evt?.hubId
     def parsedEvent = parseDiscoveryMessage(description)
     parsedEvent << ["hub":hub]
+
+    // Force port 80 (0x50)
+    parsedEvent.port = '0050'
 
     if (parsedEvent?.ssdpTerm?.contains("udi-com:device:X_Insteon_Lighting_Device:1")) {
         def devices = getDevices()
@@ -174,10 +183,11 @@ def locationHandler(evt) {
     }
 }
 
+// Called after the last preferences page is completed
 def installed() {
     // remove location subscription
     unsubscribe()
-    state.subscribe = false
+    state.subscribed = false
 
     log.debug "Installed with settings: ${settings}"
 
@@ -189,6 +199,15 @@ def updated() {
 
     unsubscribe()
     initialize()
+}
+
+// One node needs to be selected to receive all the messages from the ISY
+// This returns its Insteon address.
+def getPrimaryNode(curNode) {
+    if (!state.primaryNode) {
+        state.primaryNode = curNode
+    }
+    return state.primaryNode
 }
 
 def initialize() {
@@ -203,11 +222,15 @@ def initialize() {
 
             /* First decide on the device network ID - assign one device
                the ISY address and give the other devices unique addresses */
-            if (nodeAddr == '27 2C 5B 1') {
-                dni = selDev.value.ip + ':0050'
+            if (getPrimaryNode(nodeAddr) == nodeAddr) {
+                // This device will receive all the updates from the ISY, and
+                // will relay the updates to the other devices.
+                dni = selDev.value.mac
             }
             else {
-                dni = selDev.value.ip + ':' + nodeAddr
+                // These devices will not directly receive any updates - the
+                // primary node will have to relay updates.
+                dni = selDev.value.mac + ':' + nodeAddr
             }
 
             def d
@@ -222,7 +245,7 @@ def initialize() {
                     "data": [
                         "nodeAddr": nodeAddr,
                         "ip": selDev.value.ip,
-                        "port": '50' /*selDev.value.port*/,
+                        "port": selDev.value.port,
                         "username": username,
                         "password": password
                     ]
@@ -232,6 +255,7 @@ def initialize() {
     }
 }
 
+// Parse the various headers the ST hub adds into a map
 private def parseDiscoveryMessage(String description) {
     def device = [:]
     def parts = description.split(',')
@@ -290,31 +314,21 @@ private def parseDiscoveryMessage(String description) {
     device
 }
 
+// Helper function to convert hex number to integer
 private Integer convertHexToInt(hex) {
     Integer.parseInt(hex,16)
 }
 
+// Helper function to convert hex IP address into decimal dotted quad format
 private String convertHexToIP(hex) {
     [convertHexToInt(hex[0..1]),convertHexToInt(hex[2..3]),convertHexToInt(hex[4..5]),convertHexToInt(hex[6..7])].join(".")
 }
 
-private getHostAddress(ip) {
-    def port = '50'
-
-    if (!ip || !port) {
-        def parts = device.deviceNetworkId.split(":")
-        if (parts.length == 2) {
-            ip = parts[0]
-            port = parts[1]
-        } else {
-            //log.warn "Can't figure out ip and port for device: ${device.id}"
-        }
-    }
-
-    //convert IP/port
+// Get decimal ip:port from hex ip and hex port
+private getHostAddress(ip, port) {
     ip = convertHexToIP(ip)
     port = convertHexToInt(port)
-    log.debug "Using ip: ${ip} and port: ${port}"
+    //log.debug "Using ip: ${ip} and port: ${port}"
     return ip + ":" + port
 }
 
@@ -323,12 +337,15 @@ private getAuthorization() {
     "Basic " + userpassascii.encodeAsBase64().toString()
 }
 
-def getRequest(ip, path) {
+// Perform an HTTP GET request to the specified ip, port, and URL path
+// Response will be received async in locationHandler assuming no devices
+// have been created yet.
+def getRequest(ip, port, path) {
     new physicalgraph.device.HubAction(
         'method': 'GET',
         'path': path,
         'headers': [
-            'HOST': getHostAddress(ip),
+            'HOST': getHostAddress(ip, port),
             'Authorization': getAuthorization()
         ], null)
 }
