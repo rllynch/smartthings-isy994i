@@ -53,6 +53,13 @@ def parse(String description) {
         def xmlTop = new XmlSlurper().parseText(xmlText)
         def nodes = xmlTop.node
         //log.debug 'Nodes: ' + nodes.size()
+
+        def childMap = [:]
+        parent.getChildDevices().each { child ->
+            def childNodeAddr = child.getDataValue("nodeAddr")
+            childMap[childNodeAddr] = child
+        }
+
         nodes.each { node ->
             def nodeAddr = node.attributes().id
             def status = ''
@@ -63,16 +70,16 @@ def parse(String description) {
                 }
             }
 
-            if (status != '') {
-                parent.getChildDevices().each { child ->
-                    if (child.getDataValue("nodeAddr") == nodeAddr) {
-                        def value = 'on'
-                        if (status == '0') {
-                            value = 'off'
-                        }
-                        log.debug "Updating ${child.label} ${nodeAddr} to ${value}"
-                        child.sendEvent(name: 'switch', value: value)
+            if (status != '' && childMap[nodeAddr]) {
+                def child = childMap[nodeAddr]
+
+                if (child.getDataValue("nodeAddr") == nodeAddr) {
+                    def value = 'on'
+                    if (status == '0') {
+                        value = 'off'
                     }
+                    log.debug "Updating ${child.label} ${nodeAddr} to ${value}"
+                    child.sendEvent(name: 'switch', value: value)
                 }
             }
         }
