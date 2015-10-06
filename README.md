@@ -13,4 +13,4 @@ Allows a SmartThings hub to control Insteon devices through an ISY-994i
 
 5) On the second preferences page, select the ISY-994i. Click Next in the top right corner.
 
-6) On the third preferences page, select which Insteon devices you'd like to control.
+6) On the third preferences page, select which Insteon devices you'd like to control. Click Done in the top right corner.
