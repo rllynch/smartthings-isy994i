@@ -1,7 +1,7 @@
 /**
- *  ISY Controller
+ *  ISY Controller - Dimmer devicetype
  *
- *  Copyright 2014 Richard L. Lynch <rich@richlynch.com>
+ *  Copyright 2016 Richard L. Lynch <rich@richlynch.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -15,8 +15,9 @@
  */
 
 metadata {
-    definition (name: "ISY Switch", namespace: "isy", author: "Richard L. Lynch") {
+    definition (name: "ISY Dimmer", namespace: "isy", author: "Richard L. Lynch") {
         capability "Switch"
+        capability "Switch Level"
         capability "Polling"
         capability "Refresh"
         capability "Actuator"
@@ -25,12 +26,18 @@ metadata {
     simulator {
     }
 
-    tiles {
-        standardTile("switch", "device.switch", width: 2, height: 2, canChangeIcon: true) {
-            state "on", label:'${name}', action:"switch.off", icon:"st.switches.switch.on", backgroundColor:"#79b821", nextState:"off"
-            state "off", label:'${name}', action:"switch.on", icon:"st.switches.switch.off", backgroundColor:"#ffffff", nextState:"on"
+    tiles(scale: 2) {
+        multiAttributeTile(name:"switch", type: "lighting", width: 6, height: 4, canChangeIcon: true){
+            tileAttribute ("device.switch", key: "PRIMARY_CONTROL") {
+                attributeState "on", label:'${name}', action:"switch.off", icon:"st.switches.light.on", backgroundColor:"#79b821", nextState:"off"
+                attributeState "off", label:'${name}', action:"switch.on", icon:"st.switches.light.off", backgroundColor:"#ffffff", nextState:"on"
+            }
+            tileAttribute ("device.level", key: "SLIDER_CONTROL") {
+                attributeState "level", action:"switch level.setLevel"
+            }
         }
-        standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat") {
+
+        standardTile("refresh", "device.switch", inactiveLabel: false, decoration: "flat", width: 2, height: 2) {
             state "default", label:'', action:"refresh.refresh", icon:"st.secondary.refresh"
         }
 
@@ -82,7 +89,6 @@ def parse(String description) {
                     status = status.toInteger()
                     log.debug "Updating ${child.label} ${nodeAddr} to ${value}/${status}"
                     child.sendEvent(name: 'switch', value: value)
-
                     if (status != 0) {
                         child.sendEvent(name: 'level', value: status)
                     }
@@ -130,11 +136,13 @@ def getRequest(path) {
 
 // handle commands
 def on() {
-    log.debug "Executing 'on'"
+    def level = device.latestValue('level').toFloat() * 255.0 / 99.0
+    level = level.toInteger()
+    log.debug "Executing 'on' ${level}"
 
     sendEvent(name: 'switch', value: 'on')
     def node = getDataValue("nodeAddr").replaceAll(" ", "%20")
-    def path = "/rest/nodes/${node}/cmd/DON"
+    def path = "/rest/nodes/${node}/cmd/DON/${level}"
     getRequest(path)
 }
 
@@ -144,6 +152,19 @@ def off() {
     sendEvent(name: 'switch', value: 'off')
     def node = getDataValue("nodeAddr").replaceAll(" ", "%20")
     def path = "/rest/nodes/${node}/cmd/DOF"
+    getRequest(path)
+}
+
+def setLevel(value) {
+    log.debug "Executing dim ${value}"
+
+    sendEvent(name: 'switch', value: 'on')
+    sendEvent(name: 'level', value: value)
+
+    value = value.toFloat() * 255.0 / 99.0
+    value = value.toInteger()
+    def node = getDataValue("nodeAddr").replaceAll(" ", "%20")
+    def path = "/rest/nodes/${node}/set/DON/${value}"
     getRequest(path)
 }
 
