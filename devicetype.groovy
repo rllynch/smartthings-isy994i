@@ -15,7 +15,7 @@
  */
 
 metadata {
-    definition (name: "ISY Controller", namespace: "isy", author: "Richard L. Lynch") {
+    definition (name: "ISY Switch", namespace: "isy", author: "Richard L. Lynch") {
         capability "Switch"
         capability "Polling"
         capability "Refresh"
@@ -78,8 +78,14 @@ def parse(String description) {
                     if (status == '0') {
                         value = 'off'
                     }
-                    log.debug "Updating ${child.label} ${nodeAddr} to ${value}"
+                    status = status.toFloat() * 99.0 / 255.0
+                    status = status.toInteger()
+                    log.debug "Updating ${child.label} ${nodeAddr} to ${value}/${status}"
                     child.sendEvent(name: 'switch', value: value)
+
+                    if (status != 0) {
+                        child.sendEvent(name: 'level', value: status)
+                    }
                 }
             }
         }
