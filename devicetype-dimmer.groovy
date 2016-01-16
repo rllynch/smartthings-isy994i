@@ -136,10 +136,11 @@ def getRequest(path) {
 
 // handle commands
 def on() {
-    def level = device.latestValue('level').toFloat() * 255.0 / 99.0
-    level = level.toInteger()
+    def level = device.latestValue('level')
     log.debug "Executing 'on' ${level}"
 
+    level = level.toFloat() * 255.0 / 99.0
+    level = level.toInteger()
     sendEvent(name: 'switch', value: 'on')
     def node = getDataValue("nodeAddr").replaceAll(" ", "%20")
     def path = "/rest/nodes/${node}/cmd/DON/${level}"
