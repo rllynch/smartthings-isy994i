@@ -240,7 +240,7 @@ def initialize() {
 
             if (!d) {
                 log.debug("Adding node ${nodeAddr} as ${dni}: ${nodes[nodeAddr]}")
-                d = addChildDevice("isy", "ISY Controller", dni, selDev?.value.hub, [
+                d = addChildDevice("isy", "ISY Switch", dni, selDev?.value.hub, [
                     "label": nodes[nodeAddr],
                     "data": [
                         "nodeAddr": nodeAddr,
