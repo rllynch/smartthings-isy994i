@@ -164,6 +164,9 @@ def setLevel(value) {
 
     value = value.toFloat() * 255.0 / 99.0
     value = value.toInteger()
+    if (value > 255) {
+        value = 255
+    }
     def node = getDataValue("nodeAddr").replaceAll(" ", "%20")
     def path = "/rest/nodes/${node}/set/DON/${value}"
     getRequest(path)
