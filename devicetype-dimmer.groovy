@@ -85,10 +85,17 @@ def parse(String description) {
                     if (status == '0') {
                         value = 'off'
                     }
-                    status = status.toFloat() * 99.0 / 255.0
-                    status = status.toInteger()
+                    try {
+                        status = status.toFloat() * 99.0 / 255.0
+                        status = status.toInteger()
+                    } catch (NumberFormatException ex) {
+                        log.debug "Exception parsing ${status}: ${ex} (will assume device is off)"
+                        status = '0'
+                        value = 'off'
+                    }
                     log.debug "Updating ${child.label} ${nodeAddr} to ${value}/${status}"
                     child.sendEvent(name: 'switch', value: value)
+
                     if (status != 0) {
                         child.sendEvent(name: 'level', value: status)
                     }
