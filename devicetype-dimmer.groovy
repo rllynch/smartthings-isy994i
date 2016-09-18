@@ -62,7 +62,7 @@ def parse(String description) {
         //log.debug 'Nodes: ' + nodes.size()
 
         def childMap = [:]
-        parent.getChildDevices().each { child ->
+        parent.getAllChildDevices().each { child ->
             def childNodeAddr = child.getDataValue("nodeAddr")
             childMap[childNodeAddr] = child
         }
