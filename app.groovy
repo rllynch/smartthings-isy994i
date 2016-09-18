@@ -157,7 +157,7 @@ def locationHandler(evt) {
             }
 
             if (deviceChangedValues) {
-                def children = getChildDevices()
+                def children = getAllChildDevices()
                 children.each {
                     if (it.getDeviceDataByName("mac") == parsedEvent.mac) {
                         //it.subscribe(parsedEvent.ip, parsedEvent.port)
@@ -234,7 +234,7 @@ def initialize() {
             }
 
             def d
-            d = getChildDevices()?.find {
+            d = getAllChildDevices()?.find {
                 it.device.deviceNetworkId == dni
             }
 
